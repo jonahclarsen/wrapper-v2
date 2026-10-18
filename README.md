@@ -187,6 +187,21 @@ deletes that data. The service starts automatically whenever the VM starts.
 Advanced `WRAPPER_*` settings can be placed in `/app/runtime.env` inside the VM;
 `start` preserves them and refreshes only the bind addresses and ports.
 
+To start the VM automatically with gamdl and stop it when gamdl exits:
+
+```bash
+python3 tools/gamdl.py --install-launcher
+gamdl "https://music.apple.com/..."
+```
+
+This installs a launcher at `~/.local/bin/gamdl`, preserving the original
+installed gamdl executable. Keep `~/.local/bin` before that executable's
+directory in `PATH`. Help/version commands skip VM startup. Overlapping gamdl
+jobs share the VM until the last job exits; normal exit, errors, Ctrl+C, and
+SIGTERM all trigger cleanup. Startup uses the existing build without rebuilding.
+Run `bash tools/macos.sh start` after changing the wrapper's source code.
+Lifecycle logs live in `.local/gamdl-lifecycle.log`.
+
 On native Linux, install a C/C++ toolchain, CMake, Ninja, Rust, jq, unzip, and
 NDK r23b. `ANDROID_NDK_HOME=/path/to/ndk bash tools/build-native.sh app.apkm`
 builds the same binaries without Docker. Run from `/app` (the supervisor's

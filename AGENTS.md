@@ -7,3 +7,5 @@ Permanent local ports live in ignored `.local/ports.json`. Choose new ports with
 Keep APKs, NDK downloads, extracted Apple libraries, and session data ignored. Verify native libraries against `LIBS_VERSION.json`. Run `cargo test --locked` and verify `/health?deep=1` and `/me` with Apple initialization enabled after runtime or build changes. Playback readiness is `/me.runtime.playback_ready`; plain `/health` only checks the supervisor. Do not print or save authentication tokens from `/me`.
 
 Prefer pnpm for JavaScript tooling.
+
+`~/.local/bin/gamdl` links to `tools/gamdl.py`. Its original executable is saved in ignored `.local/gamdl.json`. The launcher boots the existing VM without rebuilding, shares it across concurrent jobs, and stops it after the final job exits. Test lifecycle changes with `python3 -m unittest discover -s tests -v`; preserve exit codes and signal cleanup.
