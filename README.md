@@ -37,8 +37,8 @@ through HTTP; clients use the raw TCP decrypt protocol on
 
 | Method   | Path         | Description                                                                                                                                                                                                                                                                                                                                                                        |
 | -------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/health`    | Liveness probe. `{status, version, runtime}` — `runtime.playback_ready` is true when FPS decrypt is available.                                                                                                                                                                                                                                                                     |
-| `GET`    | `/me`        | `{version, runtime, auth}` — same runtime flags as `/health`.                                                                                                                                                                                                                                                                                                                      |
+| `GET`    | `/health`    | Supervisor liveness: `{status, version, mode, worker, worker_ipc}`. Add `?deep=1` to probe worker IPC.                                                                                                                                                                                                                                                                              |
+| `GET`    | `/me`        | `{version, runtime, auth}` — `runtime.playback_ready` is true when the FPS playback stack initialized.                                                                                                                                                                                                                                                                             |
 | `POST`   | `/login`     | Body: `{"username": "...", "password": "..."}` or `{"apple_id": "...", "password": "..."}` (synonyms). Drives Apple's `AuthenticateFlow`. Returns `200` + token snapshot, `202` if **2FA** is required (then `POST /login/2fa`), or `401` on failure.                                                                                                                              |
 | `POST`   | `/login/2fa` | Body: `{"code": "123456"}`. Continues a login waiting for HSA2.                                                                                                                                                                                                                                                                                                                    |
 | `GET`    | `/playback`  | Query string `?adam_id=<numeric store id>`. Returns `200` with a JSON object `{"songList":[...]}` containing the **whole MZ playback dispatch** Apple's `subDownload` URL bag returns (every flavor, key URI, asset URL, metadata field). CFData fields are base64; CFDate fields are ISO 8601. Needs an **authenticated** session; otherwise `401` / `503`. Apple errors -> `502`. |
@@ -142,6 +142,60 @@ Optional `WRAPPER_APPLE_ID` only sets the `apple_id` label in `/me` after restor
 ```
 
 ## Building
+
+### Without Docker on macOS
+
+The Android libraries need a Linux kernel. This workflow uses a dedicated Lima
+Ubuntu VM with **containerd disabled**; Docker is neither installed nor used.
+The C++ worker is built on the Mac with Google's NDK r23b. The unchanged Linux
+launcher and Rust supervisor are built and run in the VM under systemd.
+
+Install the host tools (macOS 13.5 or later):
+
+```bash
+brew install lima cmake ninja python
+```
+
+Supply the same pinned Apple Music **3.6.0-beta (1109)** APK/APKM as the Docker
+build, then:
+
+```bash
+bash tools/macos.sh setup path/to/apple-music.apkm
+```
+
+Setup downloads the NDK and Ubuntu image once, verifies and stages the native
+libraries for the Mac's architecture, builds both components, runs the Rust
+tests, and starts the service. Allow several GB of disk space. Only this repo
+is shared with the VM, read-only; builds and session data stay on its Linux disk.
+
+The command prints the HTTP URL and decrypt address. Their ports are randomly
+chosen once and saved in ignored `.local/ports.json`. Use those values for
+`wrapper_url` and `wrapper_decrypt_port` in gamdl. Both listeners bind to loopback.
+
+```bash
+curl "http://127.0.0.1:$(jq -r .http .local/ports.json)/health"
+bash tools/macos.sh logs
+bash tools/macos.sh stop
+bash tools/macos.sh start
+```
+
+`start` copies updated sources, rebuilds the Linux binaries, and restarts the
+service. After C++ changes, rerun `setup` with the APK to rebuild the Android
+worker too. Stopping/restarting keeps Apple session data in the VM at
+`/app/rootfs/data/data/com.apple.android.music/files`. Deleting the Lima instance
+deletes that data. The service starts automatically whenever the VM starts.
+Advanced `WRAPPER_*` settings can be placed in `/app/runtime.env` inside the VM;
+`start` preserves them and refreshes only the bind addresses and ports.
+
+On native Linux, install a C/C++ toolchain, CMake, Ninja, Rust, jq, unzip, and
+NDK r23b. `ANDROID_NDK_HOME=/path/to/ndk bash tools/build-native.sh app.apkm`
+builds the same binaries without Docker. Run from `/app` (the supervisor's
+launcher path), copy the system CA bundle to `rootfs/etc/ssl/certs/`, and run
+`sudo ./target/release/wrapperd`. Root is required for the launcher's mounts and
+chroot. Protect the resulting session directory.
+
+Downstream clients must support wrapper-v2's `WV2D` decrypt protocol. A client
+that only supports the original wrapper's protocol will need an update.
 
 ### One-time setup
 

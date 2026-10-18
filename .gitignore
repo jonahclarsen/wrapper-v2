@@ -1,4 +1,11 @@
 /target/
+/.local/
+/build/
+/wrapper
+/rootfs/dev/
+/rootfs/proc/
+/rootfs/etc/
+/rootfs/data/
 
 # Runtime/session data mounted by compose.yaml.
 /data/
