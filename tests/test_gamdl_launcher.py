@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 import signal
 import subprocess
@@ -17,7 +16,7 @@ class LifetimeTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         fake = self.root / 'gamdl'
-        fake.write_text(f'#!{sys.executable}\nimport pathlib,sys,time\npathlib.Path(sys.argv[2]).touch()\ntime.sleep(float(sys.argv[1]))\nsys.exit(int(sys.argv[3]))\n')
+        fake.write_text(f'#!{sys.executable}\nimport json,pathlib,sys,time\nargs=sys.argv[1:]\noriginal=args[:]\nif args[0]=="--use-wrapper":args=args[1:]\npathlib.Path(args[1]).touch()\npathlib.Path(args[1]+".args").write_text(json.dumps(original))\ntime.sleep(float(args[0]))\nsys.exit(int(args[2]))\n')
         fake.chmod(0o755)
         (self.root / 'gamdl.json').write_text(json.dumps({'executable': str(fake)}))
         self.bootstrap = self.root / 'run.py'
@@ -37,8 +36,9 @@ if '--fail-start' in sys.argv:
 sys.exit(m.main(sys.argv[1:]))
 ''')
 
-    def launch(self, duration, name, code=0, extra=()):
-        p = subprocess.Popen([sys.executable, str(self.bootstrap), str(duration), str(self.root / name), str(code), *extra], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    def launch(self, duration, name, code=0, extra=(), alac=True):
+        codec = ['--song-codec-priority', 'alac'] if alac else []
+        p = subprocess.Popen([sys.executable, str(self.bootstrap), str(duration), str(self.root / name), str(code), *codec, *extra], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.addCleanup(lambda: p.poll() is None and p.kill())
         return p
 
@@ -57,6 +57,23 @@ sys.exit(m.main(sys.argv[1:]))
         self.assertEqual(p.wait(timeout=5), 7)
         self.assertEqual(self.events(), ['up', 'down'])
         self.assertEqual(json.loads((self.root / 'gamdl-leases.json').read_text()), [])
+        self.assertEqual(json.loads((self.root / 'one.args').read_text())[0], '--use-wrapper')
+
+    def test_normal_and_aac_downloads_skip_vm(self):
+        for name, extra in [('normal', ()), ('aac', ('--song-codec-priority', 'aac-web'))]:
+            with self.subTest(name=name):
+                p = self.launch(.01, name, 7, extra=extra, alac=False)
+                self.assertEqual(p.wait(timeout=5), 7)
+                self.assertFalse((self.root / 'events').exists())
+                self.assertNotIn('--use-wrapper', json.loads((self.root / (name+'.args')).read_text()))
+
+    def test_equals_and_comma_priority_and_last_option(self):
+        p = self.launch(.01, 'equals', extra=('--song-codec-priority=aac-web,alac',), alac=False)
+        self.assertEqual(p.wait(timeout=5), 0)
+        self.assertEqual(self.events(), ['up', 'down'])
+        p = self.launch(.01, 'override', extra=('--song-codec-priority=aac-web',))
+        self.assertEqual(p.wait(timeout=5), 0)
+        self.assertEqual(self.events(), ['up', 'down'])
 
     def test_overlapping_runs_stop_after_last_exit(self):
         first = self.launch(.3, 'one')

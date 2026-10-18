@@ -8,4 +8,4 @@ Keep APKs, NDK downloads, extracted Apple libraries, and session data ignored. V
 
 Prefer pnpm for JavaScript tooling.
 
-`~/.local/bin/gamdl` links to `tools/gamdl.py`. Its original executable is saved in ignored `.local/gamdl.json`. The launcher boots the existing VM without rebuilding, shares it across concurrent jobs, and stops it after the final job exits. Test lifecycle changes with `python3 -m unittest discover -s tests -v`; preserve exit codes and signal cleanup.
+`~/.local/bin/gamdl` links to `tools/gamdl.py`. Its original executable is saved in ignored `.local/gamdl.json`. Only explicit `--song-codec-priority` values containing `alac` trigger VM startup and automatic `--use-wrapper`. Regular downloads pass through unchanged. Keep the default gamdl config at `use_wrapper = false`, `song_codec_piority = aac-web` (gamdl's spelling). Bash profile aliases `gamdl-lossless` and `gamdl-alac` add `--song-codec-priority alac`. The launcher boots without rebuilding, shares the VM across ALAC jobs, and stops it after the final ALAC job exits. Test lifecycle changes with `python3 -m unittest discover -s tests -v`; preserve exit codes and signal cleanup.

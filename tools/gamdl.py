@@ -119,11 +119,25 @@ def install():
     print(f'Installed {target}')
 
 
+def alac_requested(args):
+    codec = ''
+    options = iter(args)
+    for arg in options:
+        if arg == '--':
+            break
+        if arg == '--song-codec-priority':
+            codec = next(options, '')
+        elif arg.startswith('--song-codec-priority='):
+            codec = arg.split('=', 1)[1]
+    return 'alac' in [item.strip() for item in codec.split(',')]
+
+
 def main(args):
     global interrupted
     executable = json.loads((STATE / 'gamdl.json').read_text())['executable']
-    if any(arg in ('--help', '-h', '--version') for arg in args) or not args:
-        return subprocess.call([executable, *args])
+    if any(arg in ('--help', '-h', '--version') for arg in args) or not alac_requested(args):
+        os.execv(executable, [executable, *args])
+    args = ['--use-wrapper', *args]
     signal.signal(signal.SIGINT, received)
     signal.signal(signal.SIGTERM, received)
     registered = False

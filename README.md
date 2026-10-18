@@ -187,20 +187,32 @@ deletes that data. The service starts automatically whenever the VM starts.
 Advanced `WRAPPER_*` settings can be placed in `/app/runtime.env` inside the VM;
 `start` preserves them and refreshes only the bind addresses and ports.
 
-To start the VM automatically with gamdl and stop it when gamdl exits:
+To start the VM automatically for ALAC downloads and stop it when gamdl exits:
 
 ```bash
 python3 tools/gamdl.py --install-launcher
-gamdl "https://music.apple.com/..."
+gamdl --song-codec-priority alac "https://music.apple.com/..."
 ```
 
 This installs a launcher at `~/.local/bin/gamdl`, preserving the original
 installed gamdl executable. Keep `~/.local/bin` before that executable's
-directory in `PATH`. Help/version commands skip VM startup. Overlapping gamdl
-jobs share the VM until the last job exits; normal exit, errors, Ctrl+C, and
+directory in `PATH`. Only an explicit `--song-codec-priority` containing `alac`
+starts the VM and automatically enables `--use-wrapper`; both the space and
+equals option forms work. Keep the regular config defaults at
+`use_wrapper = false` and `song_codec_piority = aac-web` (the latter spelling is
+gamdl 3.9.1's config key). Regular downloads and help/version commands skip VM
+startup. Overlapping ALAC jobs share the VM until the last ALAC job exits;
+normal exit, errors, Ctrl+C, and
 SIGTERM all trigger cleanup. Startup uses the existing build without rebuilding.
 Run `bash tools/macos.sh start` after changing the wrapper's source code.
 Lifecycle logs live in `.local/gamdl-lifecycle.log`.
+
+Convenient aliases for `~/.bash_profile`:
+
+```bash
+alias gamdl-lossless='gamdl --song-codec-priority alac'
+alias gamdl-alac='gamdl --song-codec-priority alac'
+```
 
 On native Linux, install a C/C++ toolchain, CMake, Ninja, Rust, jq, unzip, and
 NDK r23b. `ANDROID_NDK_HOME=/path/to/ndk bash tools/build-native.sh app.apkm`
